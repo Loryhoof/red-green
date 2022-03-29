@@ -29,12 +29,13 @@ export default () => {
     let velocity = new THREE.Vector3();
     let angularVel = new THREE.Vector3();
     let physicsIds = [];
-    let defaultSpawn = new THREE.Vector3(-162, -9, 1.78);
+    let defaultSpawn = new THREE.Vector3(-194, -9, 1.78);
     let headObj = null;
     let signalObj = null;
     let degrees = 180;
     let timeSincePassive = 0;
     let timeSinceActive = 0;
+    let timeSinceChangedTarget = 0;
     let hide = true;
     let goalX = 70;
     let minWait = 3500;
@@ -42,6 +43,9 @@ export default () => {
     let rotationSpeed = 2;
     let goColor = 0x2eb800;
     let stopColor = 0xc90000;
+    let eyeArray = [];
+    let laserArray = [];
+    let activeLines = [];
 
 
     /*(async () => {
@@ -68,6 +72,12 @@ export default () => {
                   }
                   if(o.name === "signal") {
                     signalObj = o;
+                  }
+                  if(o.name === "eyeL") {
+                    eyeArray[0] = o;
+                  }
+                  if(o.name === "eyeR") {
+                    eyeArray[1] = o;
                   }
                   o.castShadow = true;
                 });
@@ -109,6 +119,43 @@ export default () => {
       }
     }
 
+    const _createLine = (targetPos) => { 
+      if(activeLines.length <= 2) {
+          for (var i = 0; i < eyeArray.length; i++) {
+          var dir = new THREE.Vector3(); // create once an reuse it
+          let tempObj = eyeArray[i].clone();
+          let worldPos = new THREE.Vector3();
+          tempObj.localToWorld(worldPos);
+          dir.subVectors( targetPos, worldPos );
+          
+          var pointA = worldPos.clone();
+
+          var distance = worldPos.distanceTo(targetPos); // at what distance to determine pointB
+
+          var pointB = new THREE.Vector3();
+          pointB.addVectors ( pointA, dir.normalize().multiplyScalar( distance ) );
+
+          let points = [];
+          points.push(pointA);
+          points.push(pointB);
+          const geometry = new THREE.BufferGeometry().setFromPoints( points );
+          var material = new THREE.LineBasicMaterial( { color : 0xff0000, linewidth: 1 } );
+          var line = new THREE.Line( geometry, material );
+          app.add( line );
+          activeLines.push(line);
+        }
+      } else {
+        _clearLines();
+      }
+    }
+
+    const _clearLines = () => {
+        for (var i = 0; i < activeLines.length; i++) {
+          app.remove(activeLines[i]);
+        }
+        activeLines.length = 0;
+    }
+
 
     useFrame(({ timeDiff, timestamp }) => {
 
@@ -129,7 +176,15 @@ export default () => {
           degrees = THREE.MathUtils.clamp(degrees, 0, 180);
 
           if(degrees === 0) {
+            if((timestamp - timeSinceChangedTarget) > 500) {
+              for (var i = 0; i < npcManager.npcs.length; i++) {
+                _createLine(npcManager.npcs[i].position);
+                timeSinceChangedTarget = timestamp;
+            }
+
+            }
             if((timestamp - timeSinceActive) > 5000) {
+              _clearLines();
               timeSincePassive = timestamp;
               hide = true;
               signalObj.material.emissive = new THREE.Color(goColor);
@@ -153,6 +208,7 @@ export default () => {
           }
 
           //console.log(localPlayer.characterPhysics.velocity.length());
+
 
 
 
